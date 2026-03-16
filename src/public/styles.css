@@ -1,0 +1,334 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  padding: 20px;
+  color: #333;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+header h1 {
+  color: white;
+  font-size: 2rem;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.subtitle {
+  color: rgba(255,255,255,0.8);
+}
+
+/* Cards */
+.balance-card {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  margin-bottom: 20px;
+}
+
+.balance-card h2 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  color: #666;
+}
+
+.balance-card.big {
+  padding: 40px 20px;
+}
+
+.coin-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+}
+
+.coin-count {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.coin-count.huge {
+  font-size: 5rem;
+}
+
+.coin-label {
+  font-size: 1.2rem;
+  color: #999;
+}
+
+/* Forms */
+.add-chore {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.add-chore h2 {
+  margin-bottom: 15px;
+}
+
+#choreForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#choreForm input,
+#choreForm select {
+  padding: 12px;
+  border: 2px solid #eee;
+  border-radius: 10px;
+  font-size: 1rem;
+}
+
+#choreForm button {
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Chores Grid */
+.chores-list,
+.chores-section {
+  margin-bottom: 20px;
+}
+
+.chores-list h2,
+.chores-section h2,
+.history h2,
+.screen-time-section h2 {
+  color: white;
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+
+.chore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.chore-card {
+  background: white;
+  border-radius: 15px;
+  padding: 15px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.chore-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+}
+
+.chore-card.easy::before { background: #4ECDC4; }
+.chore-card.medium::before { background: #FFD700; }
+.chore-card.hard::before { background: #FF6B6B; }
+
+.chore-name {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.chore-value {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.chore-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.chore-badge.easy { background: #4ECDC4; color: white; }
+.chore-badge.medium { background: #FFD700; color: white; }
+.chore-badge.hard { background: #FF6B6B; color: white; }
+
+/* Kid View - Chore Buttons */
+.chore-button {
+  background: white;
+  border: none;
+  border-radius: 15px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.chore-button:active {
+  transform: scale(0.95);
+}
+
+.chore-button .chore-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.chore-button .chore-reward {
+  color: #4ECDC4;
+  font-weight: bold;
+}
+
+/* Packages */
+.packages {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.package-button {
+  background: white;
+  border: none;
+  border-radius: 15px;
+  padding: 20px;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.package-button:active:not(.disabled) {
+  transform: scale(0.95);
+}
+
+.package-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.package-button .time {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.package-button .cost {
+  color: #666;
+}
+
+/* Active Session */
+.active-session {
+  background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
+  border-radius: 20px;
+  padding: 30px;
+  text-align: center;
+  color: white;
+  margin-bottom: 20px;
+}
+
+.timer-display {
+  font-size: 4rem;
+  font-weight: bold;
+  margin: 20px 0;
+}
+
+/* History */
+.history {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-item .coins {
+  color: #4ECDC4;
+  font-weight: bold;
+}
+
+.empty {
+  color: #999;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Bottom Nav */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 15px;
+  background: rgba(255,255,255,0.95);
+  display: flex;
+  justify-content: center;
+}
+
+.nav-button {
+  padding: 12px 30px;
+  border-radius: 25px;
+  text-decoration: none;
+  font-weight: bold;
+  color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Confetti Animation */
+.confetti {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  top: -10px;
+  border-radius: 50%;
+  animation: fall 2s linear forwards;
+}
+
+@keyframes fall {
+  to {
+    transform: translateY(100vh) rotate(720deg);
+  }
+}

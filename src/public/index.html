@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stop The Rot - Parent Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Stop The Rot</h1>
+      <p class="subtitle">Parent Dashboard</p>
+    </header>
+
+    <section class="balance-card">
+      <h2>Kid's Balance</h2>
+      <div class="coin-display">
+        <span id="balance" class="coin-count">-</span>
+        <span class="coin-label">coins</span>
+      </div>
+    </section>
+
+    <section class="add-chore">
+      <h2>Add New Chore</h2>
+      <form id="choreForm">
+        <input
+          type="text"
+          id="choreName"
+          placeholder="Chore name (e.g., Clean room)"
+          required
+        >
+        <select id="choreDifficulty" required>
+          <option value="">Select difficulty...</option>
+          <option value="easy">Easy (5 coins)</option>
+          <option value="medium">Medium (10 coins)</option>
+          <option value="hard">Hard (20 coins)</option>
+        </select>
+        <button type="submit">Add Chore</button>
+      </form>
+    </section>
+
+    <section class="chores-list">
+      <h2>Active Chores</h2>
+      <div id="choresList" class="chore-grid"></div>
+    </section>
+
+    <section class="history">
+      <h2>Recent Activity</h2>
+      <div id="historyList"></div>
+    </section>
+
+    <nav class="bottom-nav">
+      <a href="kid.html" class="nav-button kid-view">Kid View</a>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const KID_ID = 1; // Default kid ID
+
+    // Load balance
+    async function loadBalance() {
+      const res = await fetch(`/api/kids/${KID_ID}`);
+      const kid = await res.json();
+      document.getElementById('balance').textContent = kid.coin_balance;
+    }
+
+    // Load chores
+    async function loadChores() {
+      const res = await fetch('/api/chores');
+      const chores = await res.json();
+      const list = document.getElementById('choresList');
+
+      if (chores.length === 0) {
+        list.innerHTML = '<p class="empty">No chores yet. Add one above!</p>';
+        return;
+      }
+
+      list.innerHTML = chores.map(chore => `
+        <div class="chore-card ${chore.difficulty}">
+          <span class="chore-name">${chore.name}</span>
+          <span class="chore-value">${chore.coin_value} coins</span>
+          <span class="chore-badge ${chore.difficulty}">${chore.difficulty}</span>
+        </div>
+      `).join('');
+    }
+
+    // Load history
+    async function loadHistory() {
+      const res = await fetch(`/api/kids/${KID_ID}/history`);
+      const history = await res.json();
+      const list = document.getElementById('historyList');
+
+      if (history.length === 0) {
+        list.innerHTML = '<p class="empty">No activity yet.</p>';
+        return;
+      }
+
+      list.innerHTML = history.map(item => `
+        <div class="history-item">
+          <span>Completed: ${item.chore_name}</span>
+          <span class="coins">+${item.coins_earned} coins</span>
+        </div>
+      `).join('');
+    }
+
+    // Add chore
+    document.getElementById('choreForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('choreName').value;
+      const difficulty = document.getElementById('choreDifficulty').value;
+
+      const res = await fetch('/api/chores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, difficulty })
+      });
+
+      if (res.ok) {
+        document.getElementById('choreName').value = '';
+        document.getElementById('choreDifficulty').value = '';
+        loadChores();
+      }
+    });
+
+    // Initial load
+    loadBalance();
+    loadChores();
+    loadHistory();
+
+    // Refresh every 5 seconds
+    setInterval(() => {
+      loadBalance();
+      loadHistory();
+    }, 5000);
+  </script>
+</body>
+</html>

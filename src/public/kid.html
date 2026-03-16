@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stop The Rot</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container kid-view">
+    <header>
+      <h1>Your Coins</h1>
+    </header>
+
+    <section class="balance-card big">
+      <div class="coin-display">
+        <span id="balance" class="coin-count huge">-</span>
+        <span class="coin-label">coins</span>
+      </div>
+    </section>
+
+    <section class="chores-section">
+      <h2>Complete a Chore</h2>
+      <div id="choresList" class="chore-grid"></div>
+    </section>
+
+    <section class="screen-time-section">
+      <h2>Buy Screen Time</h2>
+      <div id="packages" class="packages"></div>
+    </section>
+
+    <section class="active-session" id="activeSession" style="display: none;">
+      <h2>Screen Time Active!</h2>
+      <div class="timer-display">
+        <span id="timeRemaining">--:--</span>
+      </div>
+      <p>Have fun!</p>
+    </section>
+
+    <nav class="bottom-nav">
+      <a href="index.html" class="nav-button parent-view">Parent View</a>
+    </nav>
+  </div>
+
+  <script>
+    const KID_ID = 1;
+    let activeTimer = null;
+
+    // Load balance
+    async function loadBalance() {
+      const res = await fetch(`/api/kids/${KID_ID}`);
+      const kid = await res.json();
+      document.getElementById('balance').textContent = kid.coin_balance;
+      return kid.coin_balance;
+    }
+
+    // Load chores
+    async function loadChores() {
+      const res = await fetch('/api/chores');
+      const chores = await res.json();
+      const list = document.getElementById('choresList');
+
+      if (chores.length === 0) {
+        list.innerHTML = '<p class="empty">No chores available yet!</p>';
+        return;
+      }
+
+      list.innerHTML = chores.map(chore => `
+        <button class="chore-button ${chore.difficulty}" onclick="completeChore(${chore.id})">
+          <span class="chore-name">${chore.name}</span>
+          <span class="chore-reward">+${chore.coin_value} coins</span>
+        </button>
+      `).join('');
+    }
+
+    // Complete chore
+    async function completeChore(choreId) {
+      const res = await fetch(`/api/chores/${choreId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kidId: KID_ID })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Show celebration
+        celebrate();
+        loadBalance();
+      } else {
+        alert(data.error || 'Something went wrong!');
+      }
+    }
+
+    // Load packages
+    async function loadPackages() {
+      const res = await fetch('/api/screen-time/packages');
+      const packages = await res.json();
+      const balance = await loadBalance();
+      const container = document.getElementById('packages');
+
+      container.innerHTML = packages.map(pkg => `
+        <button
+          class="package-button ${balance < pkg.coins ? 'disabled' : ''}"
+          onclick="purchaseScreenTime(${pkg.minutes}, ${pkg.coins})"
+          ${balance < pkg.coins ? 'disabled' : ''}
+        >
+          <span class="time">${pkg.minutes} min</span>
+          <span class="cost">${pkg.coins} coins</span>
+        </button>
+      `).join('');
+    }
+
+    // Purchase screen time
+    async function purchaseScreenTime(minutes, coins) {
+      const res = await fetch('/api/screen-time/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kidId: KID_ID, minutes, coins })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Show celebration and refresh
+        celebrate();
+        loadBalance();
+        loadPackages();
+        checkActiveSession();
+      } else {
+        alert(data.error || 'Not enough coins!');
+      }
+    }
+
+    // Check for active session
+    async function checkActiveSession() {
+      const res = await fetch(`/api/screen-time/active?kidId=${KID_ID}`);
+      const session = await res.json();
+
+      if (session.active !== false) {
+        const expiresAt = new Date(session.expires_at);
+        const now = new Date();
+        const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+
+        if (remaining > 0) {
+          document.getElementById('activeSession').style.display = 'block';
+          updateTimer(remaining);
+          return;
+        }
+      }
+
+      document.getElementById('activeSession').style.display = 'none';
+      if (activeTimer) clearInterval(activeTimer);
+    }
+
+    // Update timer display
+    function updateTimer(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      document.getElementById('timeRemaining').textContent =
+        `${mins}:${secs.toString().padStart(2, '0')}`;
+
+      if (activeTimer) clearInterval(activeTimer);
+
+      activeTimer = setInterval(() => {
+        const newSeconds = Math.max(0, seconds - 1);
+        const m = Math.floor(newSeconds / 60);
+        const s = newSeconds % 60;
+        document.getElementById('timeRemaining').textContent =
+          `${m}:${s.toString().padStart(2, '0')}`;
+
+        if (newSeconds <= 0) {
+          clearInterval(activeTimer);
+          checkActiveSession();
+        }
+      }, 1000);
+    }
+
+    // Celebration animation
+    function celebrate() {
+      const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
+      for (let i = 0; i < 30; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animationDuration = (Math.random() * 2 + 1) + 's';
+        document.body.appendChild(confetti);
+        setTimeout(() => confetti.remove(), 3000);
+      }
+    }
+
+    // Initial load
+    loadBalance();
+    loadChores();
+    loadPackages();
+    checkActiveSession();
+
+    // Refresh every 10 seconds
+    setInterval(() => {
+      loadBalance();
+      checkActiveSession();
+    }, 10000);
+  </script>
+</body>
+</html>
