@@ -16,16 +16,9 @@ const dbPath = process.env.AWS_LAMBDA_FUNCTION_NAME
 let db: any;
 
 async function initDatabase() {
-  // On Netlify: fetch WASM binary from CDN and pass it directly (no filesystem needed).
-  // Locally: initSqlJs() finds the WASM file via node_modules automatically.
-  let SQL: any;
-  if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    const res = await fetch('https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.wasm');
-    const wasmBinary = new Uint8Array(await res.arrayBuffer());
-    SQL = await initSqlJs({ wasmBinary });
-  } else {
-    SQL = await initSqlJs();
-  }
+  // sql.js is marked external in netlify.toml so esbuild doesn't bundle it —
+  // meaning node_modules/sql.js (including its WASM file) is included as-is.
+  const SQL = await initSqlJs();
 
   // Load existing DB or create new
   let dbData: Uint8Array | undefined;

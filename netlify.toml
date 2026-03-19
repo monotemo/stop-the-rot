@@ -5,7 +5,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["node_modules/sql.js/dist/sql-wasm.wasm"]
+  external_node_modules = ["sql.js"]
 
 [[redirects]]
   from = "/api/*"
