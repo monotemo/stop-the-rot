@@ -16,12 +16,8 @@ const dbPath = process.env.NETLIFY
 let db: any;
 
 async function initDatabase() {
-  // Use CDN-hosted WASM on Netlify to avoid bundler path issues with sql.js
-  const SQL = await initSqlJs(
-    process.env.NETLIFY
-      ? { locateFile: (f: string) => `https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/${f}` }
-      : {}
-  );
+  // sql-wasm.wasm is bundled via netlify.toml included_files and lands next to the function
+  const SQL = await initSqlJs();
 
   // Load existing DB or create new
   let dbData: Uint8Array | undefined;
