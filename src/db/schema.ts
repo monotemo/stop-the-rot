@@ -4,12 +4,20 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(__dirname, '../../unrot.db');
+// On Netlify, /tmp is the only writable directory (ephemeral — fine for testing)
+const dbPath = process.env.NETLIFY
+  ? '/tmp/unrot.db'
+  : join(__dirname, '../../unrot.db');
 
 let db: any;
 
 async function initDatabase() {
-  const SQL = await initSqlJs();
+  // Use CDN-hosted WASM on Netlify to avoid bundler path issues with sql.js
+  const SQL = await initSqlJs(
+    process.env.NETLIFY
+      ? { locateFile: (f: string) => `https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/${f}` }
+      : {}
+  );
 
   // Load existing DB or create new
   let dbData: Uint8Array | undefined;
