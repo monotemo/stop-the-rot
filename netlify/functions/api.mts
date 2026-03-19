@@ -10,15 +10,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check before DB init — useful for debugging env vars
+// Health check — no DB needed
 app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    time: new Date().toISOString(),
-    NETLIFY: process.env.NETLIFY,
-    AWS_LAMBDA_FUNCTION_NAME: process.env.AWS_LAMBDA_FUNCTION_NAME,
-    NODE_ENV: process.env.NODE_ENV,
-  });
+  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
 // Lazy DB init — runs once per container lifecycle
