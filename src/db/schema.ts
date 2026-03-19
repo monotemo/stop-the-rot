@@ -9,7 +9,7 @@ const __dirname = (() => {
   try { return dirname(fileURLToPath(import.meta.url)); }
   catch { return process.cwd(); }
 })();
-const dbPath = process.env.NETLIFY
+const dbPath = process.env.AWS_LAMBDA_FUNCTION_NAME
   ? '/tmp/unrot.db'
   : join(__dirname, '../../unrot.db');
 
@@ -19,7 +19,7 @@ async function initDatabase() {
   // On Netlify: fetch WASM binary from CDN and pass it directly (no filesystem needed).
   // Locally: initSqlJs() finds the WASM file via node_modules automatically.
   let SQL: any;
-  if (process.env.NETLIFY) {
+  if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
     const res = await fetch('https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.wasm');
     const wasmBinary = new Uint8Array(await res.arrayBuffer());
     SQL = await initSqlJs({ wasmBinary });
