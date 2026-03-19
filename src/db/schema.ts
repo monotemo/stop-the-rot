@@ -16,8 +16,16 @@ const dbPath = process.env.NETLIFY
 let db: any;
 
 async function initDatabase() {
-  // sql-wasm.wasm is bundled via netlify.toml included_files and lands next to the function
-  const SQL = await initSqlJs();
+  // On Netlify: fetch WASM binary from CDN and pass it directly (no filesystem needed).
+  // Locally: initSqlJs() finds the WASM file via node_modules automatically.
+  let SQL: any;
+  if (process.env.NETLIFY) {
+    const res = await fetch('https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.wasm');
+    const wasmBinary = new Uint8Array(await res.arrayBuffer());
+    SQL = await initSqlJs({ wasmBinary });
+  } else {
+    SQL = await initSqlJs();
+  }
 
   // Load existing DB or create new
   let dbData: Uint8Array | undefined;
