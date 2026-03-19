@@ -3,8 +3,12 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// On Netlify, /tmp is the only writable directory (ephemeral — fine for testing)
+// Safe __dirname: import.meta.url is undefined when bundled as CJS (Netlify Functions)
+// but on Netlify we always use /tmp anyway, so the fallback is never actually used.
+const __dirname = (() => {
+  try { return dirname(fileURLToPath(import.meta.url)); }
+  catch { return process.cwd(); }
+})();
 const dbPath = process.env.NETLIFY
   ? '/tmp/unrot.db'
   : join(__dirname, '../../unrot.db');
