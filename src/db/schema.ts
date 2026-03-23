@@ -1,4 +1,4 @@
-import { createClient, type Client } from '@libsql/client';
+import { createClient, type Client } from '@libsql/client/http';
 
 export const COIN_VALUES = {
   easy: 5,
