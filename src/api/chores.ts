@@ -1,16 +1,16 @@
 import { Router } from 'express';
-import { createChore, getActiveChores, completeChore, getCompletedChores, getDatabase, getKid } from '../db/queries.js';
+import { createChore, getActiveChores, completeChore, getKid } from '../db/queries.js';
 
 const router = Router();
 
 // Get all active chores
-router.get('/', (req, res) => {
-  const chores = getActiveChores();
+router.get('/', async (_req, res) => {
+  const chores = await getActiveChores();
   res.json(chores);
 });
 
 // Create a new chore (parent)
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { name, difficulty } = req.body;
 
   if (!name || !difficulty) {
@@ -22,21 +22,15 @@ router.post('/', (req, res) => {
   }
 
   try {
-    createChore(name, difficulty);
-
-    // Get the last inserted chore
-    const db = getDatabase();
-    const result = db.exec('SELECT last_insert_rowid() as id');
-    const lastId = result[0]?.values[0]?.[0];
-
-    res.status(201).json({ id: lastId, name, difficulty });
+    const lastId = await createChore(name, difficulty);
+    res.status(201).json({ id: Number(lastId), name, difficulty });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Complete a chore (kid)
-router.post('/:id/complete', (req, res) => {
+router.post('/:id/complete', async (req, res) => {
   const { kidId } = req.body;
 
   if (!kidId) {
@@ -44,11 +38,8 @@ router.post('/:id/complete', (req, res) => {
   }
 
   try {
-    completeChore(Number(kidId), Number(req.params.id));
-
-    // Get updated kid balance
-    const kid = getKid(Number(kidId));
-
+    await completeChore(Number(kidId), Number(req.params.id));
+    const kid = await getKid(Number(kidId));
     res.json({
       success: true,
       coinsEarned: 'Completed',

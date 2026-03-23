@@ -5,7 +5,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["sql.js"]
+  external_node_modules = ["@libsql/client"]
 
 [[redirects]]
   from = "/api/*"
