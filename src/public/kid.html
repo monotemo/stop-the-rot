@@ -3,204 +3,330 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stop The Rot</title>
+  <title>Stop The Rot — Kid View</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container kid-view">
-    <header>
-      <h1>Your Coins</h1>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Chore completion confirm dialog -->
+  <dialog id="confirmDialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="dialog-content">
+      <h2 class="dialog-title" id="confirmTitle">Complete Chore? 🧹</h2>
+      <p class="dialog-message" id="confirmMessage"></p>
+      <div class="dialog-actions">
+        <button class="btn-secondary" id="confirmCancel">Cancel</button>
+        <button class="btn-primary" id="confirmOk">Yes, I did it! 🎉</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header class="topbar">
+      <h1>Your Coins 🪙</h1>
     </header>
 
-    <section class="balance-card big">
+    <!-- Balance card (large for kid UX) -->
+    <section class="balance-card big" aria-label="Your coin balance">
       <div class="coin-display">
-        <span id="balance" class="coin-count huge">-</span>
+        <span id="balance" class="coin-count huge">—</span>
         <span class="coin-label">coins</span>
       </div>
     </section>
 
-    <section class="chores-section">
-      <h2>Complete a Chore</h2>
-      <div id="choresList" class="chore-grid"></div>
-    </section>
-
-    <section class="screen-time-section">
-      <h2>Buy Screen Time</h2>
-      <div id="packages" class="packages"></div>
-    </section>
-
-    <section class="active-session" id="activeSession" style="display: none;">
-      <h2>Screen Time Active!</h2>
+    <!-- Active screen time session (hidden until active) -->
+    <section class="active-session" id="activeSession" style="display: none;" aria-live="polite" aria-label="Active screen time session">
+      <h2>⏱ Screen Time Active!</h2>
       <div class="timer-display">
         <span id="timeRemaining">--:--</span>
       </div>
-      <p>Have fun!</p>
+      <p>Have fun! 🎉</p>
     </section>
 
-    <nav class="bottom-nav">
-      <a href="index.html" class="nav-button parent-view">Parent View</a>
-    </nav>
-  </div>
+    <!-- Chores section -->
+    <section class="chores-section" aria-labelledby="choresHeading">
+      <h2 id="choresHeading">Complete a Chore</h2>
+      <div id="choresList" class="chore-grid"></div>
+    </section>
 
+    <!-- Screen time packages -->
+    <section class="screen-time-section" aria-labelledby="packagesHeading">
+      <h2 id="packagesHeading">Buy Screen Time</h2>
+      <div id="packages" class="packages"></div>
+    </section>
+
+    <!-- Bottom navigation -->
+    <nav class="bottom-nav" aria-label="Switch to parent view">
+      <a href="index.html" class="nav-button">← Parent View</a>
+    </nav>
+
+  </div><!-- /container -->
+
+  <script src="app.js"></script>
   <script>
     const KID_ID = 1;
     let activeTimer = null;
+    let currentBalance = 0;
+    let pendingChoreId = null;
 
-    // Load balance
+    // ── Toast ──────────────────────────────────
+    function showToast(message, type = 'default', duration = 3200) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (type !== 'default' ? ' ' + type : '');
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.animation = 'toast-out 0.25s ease forwards';
+        setTimeout(() => toast.remove(), 260);
+      }, duration);
+    }
+
+    // ── Confirm dialog wiring ──────────────────
+    const confirmDialog = document.getElementById('confirmDialog');
+    const confirmMessage = document.getElementById('confirmMessage');
+
+    document.getElementById('confirmCancel').addEventListener('click', () => {
+      confirmDialog.close();
+      pendingChoreId = null;
+    });
+
+    document.getElementById('confirmOk').addEventListener('click', async () => {
+      confirmDialog.close();
+      if (pendingChoreId !== null) {
+        const id = pendingChoreId;
+        pendingChoreId = null;
+        await doCompleteChore(id);
+      }
+    });
+
+    // Close on backdrop click
+    confirmDialog.addEventListener('click', (e) => {
+      if (e.target === confirmDialog) {
+        confirmDialog.close();
+        pendingChoreId = null;
+      }
+    });
+
+    // ── Balance ────────────────────────────────
     async function loadBalance() {
-      const res = await fetch(`/api/kids/${KID_ID}`);
-      const kid = await res.json();
-      document.getElementById('balance').textContent = kid.coin_balance;
-      return kid.coin_balance;
+      try {
+        const kid = await API.kids.get(KID_ID);
+        currentBalance = kid.coin_balance;
+        document.getElementById('balance').textContent = currentBalance;
+        return currentBalance;
+      } catch {
+        document.getElementById('balance').textContent = '—';
+        return 0;
+      }
     }
 
-    // Load chores
+    // ── Chores ─────────────────────────────────
     async function loadChores() {
-      const res = await fetch('/api/chores');
-      const chores = await res.json();
       const list = document.getElementById('choresList');
-
-      if (chores.length === 0) {
-        list.innerHTML = '<p class="empty">No chores available yet!</p>';
-        return;
-      }
-
-      list.innerHTML = chores.map(chore => `
-        <button class="chore-button ${chore.difficulty}" onclick="completeChore(${chore.id})">
-          <span class="chore-name">${chore.name}</span>
-          <span class="chore-reward">+${chore.coin_value} coins</span>
-        </button>
-      `).join('');
-    }
-
-    // Complete chore
-    async function completeChore(choreId) {
-      const res = await fetch(`/api/chores/${choreId}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kidId: KID_ID })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        // Show celebration
-        celebrate();
-        loadBalance();
-      } else {
-        alert(data.error || 'Something went wrong!');
-      }
-    }
-
-    // Load packages
-    async function loadPackages() {
-      const res = await fetch('/api/screen-time/packages');
-      const packages = await res.json();
-      const balance = await loadBalance();
-      const container = document.getElementById('packages');
-
-      container.innerHTML = packages.map(pkg => `
-        <button
-          class="package-button ${balance < pkg.coins ? 'disabled' : ''}"
-          onclick="purchaseScreenTime(${pkg.minutes}, ${pkg.coins})"
-          ${balance < pkg.coins ? 'disabled' : ''}
-        >
-          <span class="time">${pkg.minutes} min</span>
-          <span class="cost">${pkg.coins} coins</span>
-        </button>
-      `).join('');
-    }
-
-    // Purchase screen time
-    async function purchaseScreenTime(minutes, coins) {
-      const res = await fetch('/api/screen-time/purchase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kidId: KID_ID, minutes, coins })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        // Show celebration and refresh
-        celebrate();
-        loadBalance();
-        loadPackages();
-        checkActiveSession();
-      } else {
-        alert(data.error || 'Not enough coins!');
-      }
-    }
-
-    // Check for active session
-    async function checkActiveSession() {
-      const res = await fetch(`/api/screen-time/active?kidId=${KID_ID}`);
-      const session = await res.json();
-
-      if (session.active !== false) {
-        const expiresAt = new Date(session.expires_at);
-        const now = new Date();
-        const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
-
-        if (remaining > 0) {
-          document.getElementById('activeSession').style.display = 'block';
-          updateTimer(remaining);
+      list.innerHTML = `
+        <div class="skeleton skeleton-chore"></div>
+        <div class="skeleton skeleton-chore"></div>
+        <div class="skeleton skeleton-chore"></div>
+      `;
+      try {
+        const chores = await API.chores.list();
+        if (chores.length === 0) {
+          list.innerHTML = '<p class="empty-state-gradient">No chores available yet! Ask a parent to add some. 👆</p>';
           return;
         }
+        // Use data attributes + event delegation (avoids inline onclick escaping concerns)
+        list.innerHTML = chores.map(chore => `
+          <button
+            class="chore-button ${escapeHtml(chore.difficulty)}"
+            data-chore-id="${Number(chore.id)}"
+            data-chore-name="${escapeHtml(chore.name)}"
+            data-chore-value="${Number(chore.coin_value)}"
+            aria-label="Complete ${escapeHtml(chore.name)} for ${Number(chore.coin_value)} coins"
+          >
+            <span class="chore-name">${escapeHtml(chore.name)}</span>
+            <span class="chore-reward">+${Number(chore.coin_value)} coins</span>
+          </button>
+        `).join('');
+      } catch {
+        list.innerHTML = '<p class="empty-state-gradient">Failed to load chores. Please refresh.</p>';
       }
-
-      document.getElementById('activeSession').style.display = 'none';
-      if (activeTimer) clearInterval(activeTimer);
     }
 
-    // Update timer display
+    // Event delegation for chore buttons (avoids re-binding on each render)
+    document.getElementById('choresList').addEventListener('click', (e) => {
+      const btn = e.target.closest('.chore-button');
+      if (!btn) return;
+      const choreId   = Number(btn.dataset.choreId);
+      const choreName = btn.dataset.choreName;
+      const choreValue = Number(btn.dataset.choreValue);
+      requestCompleteChore(choreId, choreName, choreValue);
+    });
+
+    function requestCompleteChore(choreId, choreName, choreValue) {
+      pendingChoreId = choreId;
+      confirmMessage.textContent = `Did you complete "${choreName}"? You'll earn ${choreValue} coins! 🪙`;
+      confirmDialog.showModal();
+    }
+
+    async function doCompleteChore(choreId) {
+      try {
+        const data = await API.chores.complete(choreId, KID_ID);
+        if (data.success) {
+          celebrate();
+          showToast(`+${data.coinsEarned} coins earned! Great work! 🎉`, 'success');
+          currentBalance = data.newBalance;
+          document.getElementById('balance').textContent = currentBalance;
+          // Refresh packages to update shortfall labels
+          loadPackages();
+        } else {
+          showToast(data.error || 'Something went wrong!', 'error');
+        }
+      } catch {
+        showToast('Failed to complete chore. Please try again.', 'error');
+      }
+    }
+
+    // ── Screen time packages ───────────────────
+    async function loadPackages() {
+      const container = document.getElementById('packages');
+      try {
+        const packages = await API.screenTime.packages();
+        const balance = currentBalance;
+        container.innerHTML = packages.map(pkg => {
+          const canAfford = balance >= pkg.coins;
+          const shortfall = pkg.coins - balance;
+          return `
+            <button
+              class="package-button${canAfford ? '' : ' disabled'}"
+              data-minutes="${Number(pkg.minutes)}"
+              data-coins="${Number(pkg.coins)}"
+              ${!canAfford ? 'disabled aria-disabled="true"' : ''}
+              aria-label="${pkg.minutes} minutes for ${pkg.coins} coins${!canAfford ? `, need ${shortfall} more coins` : ''}"
+            >
+              <span class="time">${Number(pkg.minutes)} min</span>
+              <span class="cost">${Number(pkg.coins)} coins</span>
+              ${!canAfford ? `<span class="pkg-shortfall">Need ${shortfall} more 🪙</span>` : ''}
+            </button>
+          `;
+        }).join('');
+      } catch {
+        container.innerHTML = '<p class="error-state">Failed to load packages.</p>';
+      }
+    }
+
+    // Event delegation for package buttons
+    document.getElementById('packages').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.package-button:not(.disabled)');
+      if (!btn || btn.disabled) return;
+      const minutes = Number(btn.dataset.minutes);
+      const coins   = Number(btn.dataset.coins);
+      await purchaseScreenTime(minutes, coins);
+    });
+
+    async function purchaseScreenTime(minutes, coins) {
+      try {
+        const data = await API.screenTime.purchase(KID_ID, minutes, coins);
+        if (data.success) {
+          celebrate();
+          showToast(`${minutes} min of screen time unlocked! 🎮`, 'success');
+          currentBalance = data.newBalance;
+          document.getElementById('balance').textContent = currentBalance;
+          loadPackages();
+          checkActiveSession();
+        } else {
+          showToast(data.error || 'Not enough coins!', 'error');
+        }
+      } catch {
+        showToast('Purchase failed. Please try again.', 'error');
+      }
+    }
+
+    // ── Active session ─────────────────────────
+    async function checkActiveSession() {
+      try {
+        const session = await API.screenTime.active(KID_ID);
+        if (session.active !== false && session.expires_at) {
+          const expiresAt = new Date(session.expires_at);
+          const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+          if (remaining > 0) {
+            document.getElementById('activeSession').style.display = 'block';
+            updateTimer(remaining);
+            return;
+          }
+        }
+      } catch { /* silently ignore */ }
+      document.getElementById('activeSession').style.display = 'none';
+      if (activeTimer) { clearInterval(activeTimer); activeTimer = null; }
+    }
+
     function updateTimer(seconds) {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      document.getElementById('timeRemaining').textContent =
-        `${mins}:${secs.toString().padStart(2, '0')}`;
-
+      function fmt(s) {
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      }
+      document.getElementById('timeRemaining').textContent = fmt(seconds);
       if (activeTimer) clearInterval(activeTimer);
-
+      let remaining = seconds;
       activeTimer = setInterval(() => {
-        const newSeconds = Math.max(0, seconds - 1);
-        const m = Math.floor(newSeconds / 60);
-        const s = newSeconds % 60;
-        document.getElementById('timeRemaining').textContent =
-          `${m}:${s.toString().padStart(2, '0')}`;
-
-        if (newSeconds <= 0) {
+        remaining = Math.max(0, remaining - 1);
+        document.getElementById('timeRemaining').textContent = fmt(remaining);
+        if (remaining <= 0) {
           clearInterval(activeTimer);
+          activeTimer = null;
           checkActiveSession();
         }
       }, 1000);
     }
 
-    // Celebration animation
+    // ── Confetti (varied shapes + horizontal drift) ──
     function celebrate() {
-      const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
-      for (let i = 0; i < 30; i++) {
-        const confetti = document.createElement('div');
-        confetti.className = 'confetti';
-        confetti.style.left = Math.random() * 100 + 'vw';
-        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-        confetti.style.animationDuration = (Math.random() * 2 + 1) + 's';
-        document.body.appendChild(confetti);
-        setTimeout(() => confetti.remove(), 3000);
+      const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#A67800', '#f472b6'];
+      const shapes = ['50%', '2px', '0', '50% 0 50% 0'];
+      for (let i = 0; i < 36; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti';
+        el.style.left = (Math.random() * 100) + 'vw';
+        el.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        const dur = (Math.random() * 1.5 + 1.8).toFixed(2);
+        el.style.animationDuration = dur + 's';
+        el.style.animationDelay   = (Math.random() * 0.5).toFixed(2) + 's';
+        el.style.borderRadius = shapes[Math.floor(Math.random() * shapes.length)];
+        el.style.width  = (Math.random() * 6 + 6) + 'px';
+        el.style.height = (Math.random() * 5 + 5) + 'px';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), (parseFloat(dur) + 0.6) * 1000);
       }
     }
 
-    // Initial load
-    loadBalance();
-    loadChores();
-    loadPackages();
-    checkActiveSession();
+    // ── Init & smart polling ───────────────────
+    async function init() {
+      await loadBalance();
+      await Promise.all([loadChores(), loadPackages(), checkActiveSession()]);
+    }
 
-    // Refresh every 10 seconds
-    setInterval(() => {
+    init();
+
+    let pollInterval = setInterval(() => {
       loadBalance();
       checkActiveSession();
     }, 10000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(pollInterval);
+      } else {
+        loadBalance();
+        checkActiveSession();
+        pollInterval = setInterval(() => {
+          loadBalance();
+          checkActiveSession();
+        }, 10000);
+      }
+    });
   </script>
 </body>
 </html>

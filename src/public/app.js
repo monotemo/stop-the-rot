@@ -1,5 +1,15 @@
 // Shared utilities for Stop The Rot
 
+/**
+ * Safely escape user-supplied strings before inserting into innerHTML.
+ * Prevents XSS attacks from malicious chore names or other user data.
+ */
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
 const API = {
   kids: {
     get: (id) => fetch(`/api/kids/${id}`).then(r => r.json()),

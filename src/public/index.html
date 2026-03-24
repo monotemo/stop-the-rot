@@ -3,137 +3,264 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stop The Rot - Parent Dashboard</title>
+  <title>Stop The Rot — Parent Dashboard</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+  <!-- Toast container (aria-live for screen reader announcements) -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+
   <div class="container">
-    <header>
+
+    <!-- Header -->
+    <header class="topbar">
       <h1>Stop The Rot</h1>
       <p class="subtitle">Parent Dashboard</p>
     </header>
 
-    <section class="balance-card">
-      <h2>Kid's Balance</h2>
-      <div class="coin-display">
-        <span id="balance" class="coin-count">-</span>
-        <span class="coin-label">coins</span>
+    <!-- Compact balance strip -->
+    <div class="balance-strip" role="status" aria-label="Kid's coin balance">
+      <span class="bs-label">💰 Kid's Balance</span>
+      <div class="bs-value">
+        <span id="balance" class="bs-count skeleton skeleton-balance" aria-live="polite">—</span>
+        <span class="bs-unit">coins</span>
       </div>
-    </section>
+    </div>
 
-    <section class="add-chore">
-      <h2>Add New Chore</h2>
-      <form id="choreForm">
-        <input
-          type="text"
-          id="choreName"
-          placeholder="Chore name (e.g., Clean room)"
-          required
-        >
-        <select id="choreDifficulty" required>
-          <option value="">Select difficulty...</option>
-          <option value="easy">Easy (5 coins)</option>
-          <option value="medium">Medium (10 coins)</option>
-          <option value="hard">Hard (20 coins)</option>
-        </select>
-        <button type="submit">Add Chore</button>
+    <!-- Add Chore form -->
+    <section class="add-chore" aria-labelledby="addChoreTitle">
+      <h2 id="addChoreTitle">Add New Chore</h2>
+      <form id="choreForm" novalidate>
+        <div class="form-field">
+          <label class="form-label" for="choreName">Chore Name</label>
+          <input
+            type="text"
+            id="choreName"
+            placeholder="e.g., Clean room"
+            required
+            autocomplete="off"
+          >
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="choreDifficulty">Difficulty</label>
+          <select id="choreDifficulty" required>
+            <option value="">Select difficulty…</option>
+            <option value="easy">Easy (5 coins)</option>
+            <option value="medium">Medium (10 coins)</option>
+            <option value="hard">Hard (20 coins)</option>
+          </select>
+        </div>
+        <button type="submit">+ Add Chore</button>
       </form>
     </section>
 
-    <section class="chores-list">
-      <h2>Active Chores</h2>
+    <!-- Tab navigation -->
+    <div class="tab-nav" role="tablist" aria-label="Dashboard sections">
+      <button
+        class="tab-btn active"
+        role="tab"
+        id="tab-chores"
+        aria-controls="panel-chores"
+        aria-selected="true"
+      >🧹 Active Chores</button>
+      <button
+        class="tab-btn"
+        role="tab"
+        id="tab-history"
+        aria-controls="panel-history"
+        aria-selected="false"
+      >📜 History</button>
+    </div>
+
+    <!-- Chores panel -->
+    <div id="panel-chores" role="tabpanel" aria-labelledby="tab-chores">
       <div id="choresList" class="chore-grid"></div>
-    </section>
+    </div>
 
-    <section class="history">
-      <h2>Recent Activity</h2>
-      <div id="historyList"></div>
-    </section>
+    <!-- History panel -->
+    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+      <section class="history" aria-label="Recent activity">
+        <h2>Recent Activity</h2>
+        <div id="historyList"></div>
+      </section>
+    </div>
 
-    <nav class="bottom-nav">
-      <a href="kid.html" class="nav-button kid-view">Kid View</a>
+    <!-- Bottom navigation -->
+    <nav class="bottom-nav" aria-label="Switch to kid view">
+      <a href="kid.html" class="nav-button">Kid View →</a>
     </nav>
-  </div>
+
+  </div><!-- /container -->
 
   <script src="app.js"></script>
   <script>
-    const KID_ID = 1; // Default kid ID
+    const KID_ID = 1;
 
-    // Load balance
+    // ── Toast ──────────────────────────────────
+    function showToast(message, type = 'default', duration = 3200) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (type !== 'default' ? ' ' + type : '');
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.animation = 'toast-out 0.25s ease forwards';
+        setTimeout(() => toast.remove(), 260);
+      }, duration);
+    }
+
+    // ── Timestamp formatting ───────────────────
+    function formatDateTime(dtStr) {
+      if (!dtStr) return '';
+      try {
+        // SQLite returns "YYYY-MM-DD HH:MM:SS" — replace space with T for ISO parsing
+        const date = new Date(dtStr.replace(' ', 'T'));
+        if (isNaN(date)) return '';
+        const diffMs = Date.now() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 2)  return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        const diffHrs = Math.floor(diffMins / 60);
+        if (diffHrs  < 24) return `${diffHrs}h ago`;
+        const diffDays = Math.floor(diffHrs / 24);
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays  <  7) return `${diffDays} days ago`;
+        return date.toLocaleDateString();
+      } catch { return ''; }
+    }
+
+    // ── Balance ────────────────────────────────
     async function loadBalance() {
-      const res = await fetch(`/api/kids/${KID_ID}`);
-      const kid = await res.json();
-      document.getElementById('balance').textContent = kid.coin_balance;
+      const el = document.getElementById('balance');
+      try {
+        const kid = await API.kids.get(KID_ID);
+        el.classList.remove('skeleton', 'skeleton-balance');
+        el.textContent = kid.coin_balance;
+      } catch {
+        el.classList.remove('skeleton', 'skeleton-balance');
+        el.textContent = '—';
+      }
     }
 
-    // Load chores
+    // ── Chores ─────────────────────────────────
     async function loadChores() {
-      const res = await fetch('/api/chores');
-      const chores = await res.json();
       const list = document.getElementById('choresList');
-
-      if (chores.length === 0) {
-        list.innerHTML = '<p class="empty">No chores yet. Add one above!</p>';
-        return;
+      list.innerHTML = `
+        <div class="skeleton skeleton-chore"></div>
+        <div class="skeleton skeleton-chore"></div>
+        <div class="skeleton skeleton-chore"></div>
+      `;
+      try {
+        const chores = await API.chores.list();
+        if (chores.length === 0) {
+          list.innerHTML = '<p class="empty-state-gradient">No chores yet. Add one above! 👆</p>';
+          return;
+        }
+        list.innerHTML = chores.map(chore => `
+          <div class="chore-card ${escapeHtml(chore.difficulty)}">
+            <span class="chore-name">${escapeHtml(chore.name)}</span>
+            <span class="chore-value">${escapeHtml(String(chore.coin_value))} coins</span>
+            <span class="chore-badge ${escapeHtml(chore.difficulty)}">${escapeHtml(chore.difficulty)}</span>
+          </div>
+        `).join('');
+      } catch {
+        list.innerHTML = '<p class="error-state">Failed to load chores. Please refresh.</p>';
       }
-
-      list.innerHTML = chores.map(chore => `
-        <div class="chore-card ${chore.difficulty}">
-          <span class="chore-name">${chore.name}</span>
-          <span class="chore-value">${chore.coin_value} coins</span>
-          <span class="chore-badge ${chore.difficulty}">${chore.difficulty}</span>
-        </div>
-      `).join('');
     }
 
-    // Load history
+    // ── History ────────────────────────────────
+    let historyLoaded = false;
     async function loadHistory() {
-      const res = await fetch(`/api/kids/${KID_ID}/history`);
-      const history = await res.json();
       const list = document.getElementById('historyList');
-
-      if (history.length === 0) {
-        list.innerHTML = '<p class="empty">No activity yet.</p>';
-        return;
+      list.innerHTML = '<p class="empty-state">Loading…</p>';
+      try {
+        const history = await API.kids.history(KID_ID);
+        historyLoaded = true;
+        if (history.length === 0) {
+          list.innerHTML = '<p class="empty-state">No activity yet.</p>';
+          return;
+        }
+        list.innerHTML = history.map(item => `
+          <div class="history-item">
+            <div class="history-item-info">
+              <span class="history-item-name">${escapeHtml(item.chore_name)}</span>
+              <span class="history-item-time">${escapeHtml(formatDateTime(item.completed_at))}</span>
+            </div>
+            <span class="coins">+${escapeHtml(String(item.coins_earned))} 🪙</span>
+          </div>
+        `).join('');
+      } catch {
+        list.innerHTML = '<p class="error-state">Failed to load history.</p>';
       }
-
-      list.innerHTML = history.map(item => `
-        <div class="history-item">
-          <span>Completed: ${item.chore_name}</span>
-          <span class="coins">+${item.coins_earned} coins</span>
-        </div>
-      `).join('');
     }
 
-    // Add chore
+    // ── Tabs ───────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('aria-controls');
+
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('[role="tabpanel"]').forEach(panel => {
+          panel.hidden = true;
+        });
+
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+        document.getElementById(targetId).hidden = false;
+
+        // Lazy-load history on first visit
+        if (targetId === 'panel-history' && !historyLoaded) {
+          loadHistory();
+        }
+      });
+    });
+
+    // ── Add Chore form ─────────────────────────
     document.getElementById('choreForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('choreName').value;
+      const name = document.getElementById('choreName').value.trim();
       const difficulty = document.getElementById('choreDifficulty').value;
+      if (!name || !difficulty) return;
 
-      const res = await fetch('/api/chores', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, difficulty })
-      });
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Adding…';
 
-      if (res.ok) {
+      try {
+        const result = await API.chores.create(name, difficulty);
+        if (result.error) throw new Error(result.error);
         document.getElementById('choreName').value = '';
         document.getElementById('choreDifficulty').value = '';
+        showToast('Chore added! 🎉', 'success');
         loadChores();
+        // Refresh history if it's been loaded
+        if (historyLoaded) historyLoaded = false;
+      } catch (err) {
+        showToast(err.message || 'Failed to add chore. Try again.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '+ Add Chore';
       }
     });
 
-    // Initial load
+    // ── Init & smart polling ───────────────────
     loadBalance();
     loadChores();
-    loadHistory();
 
-    // Refresh every 5 seconds
-    setInterval(() => {
-      loadBalance();
-      loadHistory();
-    }, 5000);
+    let pollInterval = setInterval(loadBalance, 5000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(pollInterval);
+      } else {
+        loadBalance();
+        pollInterval = setInterval(loadBalance, 5000);
+      }
+    });
   </script>
 </body>
 </html>
