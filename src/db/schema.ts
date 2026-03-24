@@ -15,6 +15,12 @@ export const SCREEN_TIME_PACKAGES = [
   { minutes: 120, coins: 25 },
 ] as const;
 
+export interface ScreenTimePurchase {
+  kidId: number;
+  minutes: number;
+  coins: number;
+}
+
 let _client: Client | null = null;
 
 export function getClient(): Client {

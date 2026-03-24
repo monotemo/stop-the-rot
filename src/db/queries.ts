@@ -1,4 +1,4 @@
-import { getClient, COIN_VALUES, Difficulty, SCREEN_TIME_PACKAGES } from './schema.js';
+import { getClient, COIN_VALUES, Difficulty, SCREEN_TIME_PACKAGES, type ScreenTimePurchase } from './schema.js';
 
 // Kids
 export async function getKid(id: number) {
@@ -15,7 +15,7 @@ export async function updateKidBalance(kidId: number, coins: number) {
   });
 }
 
-export async function deductCoins(kidId: number, coins: number) {
+export async function deductCoins(kidId: number, coins: number): Promise<number> {
   const kid = await getKid(kidId);
   if (!kid || Number(kid.coin_balance) < coins) {
     throw new Error('Insufficient coins');
@@ -25,6 +25,7 @@ export async function deductCoins(kidId: number, coins: number) {
     sql: 'UPDATE kids SET coin_balance = coin_balance - ? WHERE id = ?',
     args: [coins, kidId],
   });
+  return Number(kid.coin_balance) - coins;
 }
 
 // Chores
@@ -44,17 +45,21 @@ export async function getActiveChores() {
   return result.rows;
 }
 
-export async function completeChore(kidId: number, choreId: number) {
+export async function completeChore(kidId: number, choreId: number): Promise<{ coinsEarned: number; newBalance: number }> {
   const db = getClient();
   const choreResult = await db.execute({ sql: 'SELECT * FROM chores WHERE id = ?', args: [choreId] });
   const chore = choreResult.rows[0];
   if (!chore) throw new Error('Chore not found');
 
+  const coinsEarned = Number(chore.coin_value);
   await db.execute({
     sql: 'INSERT INTO completed_chores (kid_id, chore_id, coins_earned) VALUES (?, ?, ?)',
-    args: [kidId, choreId, chore.coin_value],
+    args: [kidId, choreId, coinsEarned],
   });
-  await updateKidBalance(kidId, Number(chore.coin_value));
+  await updateKidBalance(kidId, coinsEarned);
+
+  const kid = await getKid(kidId);
+  return { coinsEarned, newBalance: Number(kid?.coin_balance ?? 0) };
 }
 
 export async function getCompletedChores(kidId: number, limit = 10) {
@@ -72,15 +77,15 @@ export async function getCompletedChores(kidId: number, limit = 10) {
 }
 
 // Screen Time Sessions
-export async function createScreenTimeSession(kidId: number, minutes: number, coins: number) {
-  await deductCoins(kidId, coins);
-  const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+export async function createScreenTimeSession(purchase: ScreenTimePurchase): Promise<{ sessionId: number; newBalance: number }> {
+  const newBalance = await deductCoins(purchase.kidId, purchase.coins);
+  const expiresAt = new Date(Date.now() + purchase.minutes * 60 * 1000).toISOString();
   const db = getClient();
   const result = await db.execute({
     sql: 'INSERT INTO screen_time_sessions (kid_id, minutes_purchased, coins_spent, expires_at) VALUES (?, ?, ?, ?)',
-    args: [kidId, minutes, coins, expiresAt],
+    args: [purchase.kidId, purchase.minutes, purchase.coins, expiresAt],
   });
-  return result.lastInsertRowid;
+  return { sessionId: Number(result.lastInsertRowid), newBalance };
 }
 
 export async function getActiveSession(kidId: number) {

@@ -3,7 +3,6 @@ import {
   createScreenTimeSession,
   getActiveSession,
   endActiveSession,
-  getKid,
   SCREEN_TIME_PACKAGES,
 } from '../db/queries.js';
 
@@ -35,12 +34,15 @@ router.post('/purchase', async (req, res) => {
   }
 
   try {
-    const sessionId = await createScreenTimeSession(Number(kidId), Number(minutes), Number(coins));
-    const kid = await getKid(Number(kidId));
+    const result = await createScreenTimeSession({
+      kidId: Number(kidId),
+      minutes: Number(minutes),
+      coins: Number(coins),
+    });
     res.json({
       success: true,
-      sessionId: Number(sessionId),
-      newBalance: kid?.coin_balance,
+      sessionId: result.sessionId,
+      newBalance: result.newBalance,
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

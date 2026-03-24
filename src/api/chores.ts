@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { createChore, getActiveChores, completeChore, getKid } from '../db/queries.js';
+import { createChore, getActiveChores, completeChore } from '../db/queries.js';
+import { COIN_VALUES } from '../db/schema.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Name and difficulty required' });
   }
 
-  if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+  if (!(difficulty in COIN_VALUES)) {
     return res.status(400).json({ error: 'Difficulty must be easy, medium, or hard' });
   }
 
@@ -38,12 +39,11 @@ router.post('/:id/complete', async (req, res) => {
   }
 
   try {
-    await completeChore(Number(kidId), Number(req.params.id));
-    const kid = await getKid(Number(kidId));
+    const result = await completeChore(Number(kidId), Number(req.params.id));
     res.json({
       success: true,
-      coinsEarned: 'Completed',
-      newBalance: kid?.coin_balance,
+      coinsEarned: result.coinsEarned,
+      newBalance: result.newBalance,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
